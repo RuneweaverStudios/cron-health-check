@@ -1,0 +1,7 @@
+{
+  "name": "Cron Health Check",
+  "author": "OpenClaw",
+  "version": "1.0.0",
+  "description": "Monitors OpenClaw cron job health and identifies failures, timeouts, and delivery issues.",
+  "main": "scripts/check_cron_health.py"
+}
