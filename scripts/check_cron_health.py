@@ -169,8 +169,17 @@ def main():
     parser.add_argument("--openclaw-home", type=str, help="OpenClaw home directory (default: ~/.openclaw)")
     args = parser.parse_args()
     
-    openclaw_home = Path(args.openclaw_home) if args.openclaw_home else Path.home() / ".openclaw"
-    
+    if args.openclaw_home:
+        openclaw_home = Path(args.openclaw_home).resolve()
+        if not openclaw_home.exists():
+            print(f"Error: --openclaw-home path does not exist: {openclaw_home}", file=sys.stderr)
+            sys.exit(1)
+        if not openclaw_home.is_dir():
+            print(f"Error: --openclaw-home path is not a directory: {openclaw_home}", file=sys.stderr)
+            sys.exit(1)
+    else:
+        openclaw_home = Path.home() / ".openclaw"
+
     checker = CronHealthChecker(openclaw_home)
     results = checker.check_all_jobs(hours_back=args.hours)
     
