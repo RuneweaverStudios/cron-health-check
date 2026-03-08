@@ -5,7 +5,13 @@
   "displayName": "Cron Health Check",
   "description": "Monitors OpenClaw cron job health and identifies failures, timeouts, and delivery issues.",
   "author": "OpenClaw",
-  "tags": [],
+  "tags": [
+    "monitoring",
+    "cron",
+    "health-check",
+    "diagnostics",
+    "python"
+  ],
   "platform": "openclaw",
   "main": "scripts/check_cron_health.py"
 }
