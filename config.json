@@ -1,0 +1,12 @@
+{
+  "thresholds": {
+    "critical_consecutive_errors": 3,
+    "warning_consecutive_errors": 1,
+    "critical_timeout_count": 3,
+    "warning_timeout_count": 1,
+    "delivery_failure_threshold": 3
+  },
+  "check_interval_hours": 24,
+  "max_recent_runs": 20,
+  "max_recent_errors_displayed": 5
+}

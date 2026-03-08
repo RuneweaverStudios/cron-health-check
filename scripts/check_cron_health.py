@@ -11,6 +11,7 @@ Analyzes cron run logs to identify:
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -18,11 +19,21 @@ from typing import List, Dict, Any, Optional
 
 
 class CronHealthChecker:
-    def __init__(self, openclaw_home: Path):
+    def __init__(self, openclaw_home: Path, config: Optional[Dict[str, Any]] = None):
         self.openclaw_home = openclaw_home
         self.cron_dir = openclaw_home / "cron"
         self.jobs_file = self.cron_dir / "jobs.json"
         self.runs_dir = self.cron_dir / "runs"
+
+        # Load thresholds from config (with defaults)
+        thresholds = (config or {}).get("thresholds", {})
+        self.critical_consecutive_errors = thresholds.get("critical_consecutive_errors", 3)
+        self.warning_consecutive_errors = thresholds.get("warning_consecutive_errors", 1)
+        self.critical_timeout_count = thresholds.get("critical_timeout_count", 3)
+        self.warning_timeout_count = thresholds.get("warning_timeout_count", 1)
+        self.delivery_failure_threshold = thresholds.get("delivery_failure_threshold", 3)
+        self.max_recent_runs = (config or {}).get("max_recent_runs", 20)
+        self.max_recent_errors_displayed = (config or {}).get("max_recent_errors_displayed", 5)
         
     def load_jobs(self) -> List[Dict[str, Any]]:
         """Load cron jobs configuration."""
@@ -76,7 +87,7 @@ class CronHealthChecker:
         last_status = state.get("lastStatus", "unknown")
         last_error = state.get("lastError")
         
-        for run in runs[-20:]:  # Last 20 runs
+        for run in runs[-self.max_recent_runs:]:
             if run.get("status") == "error":
                 error = run.get("error", "")
                 recent_errors.append({
@@ -93,21 +104,21 @@ class CronHealthChecker:
         health_status = "healthy"
         issues = []
         
-        if consecutive_errors >= 3:
+        if consecutive_errors >= self.critical_consecutive_errors:
             health_status = "critical"
             issues.append(f"{consecutive_errors} consecutive errors")
-        elif consecutive_errors >= 1:
+        elif consecutive_errors >= self.warning_consecutive_errors:
             health_status = "warning"
             issues.append(f"{consecutive_errors} consecutive error(s)")
-        
-        if timeout_count >= 3:
+
+        if timeout_count >= self.critical_timeout_count:
             health_status = "critical" if health_status == "healthy" else health_status
             issues.append(f"{timeout_count} timeout(s) in recent runs")
-        elif timeout_count >= 1:
+        elif timeout_count >= self.warning_timeout_count:
             health_status = "warning" if health_status == "healthy" else health_status
             issues.append(f"{timeout_count} timeout(s)")
-        
-        if delivery_failure_count >= 3 and not job.get("delivery", {}).get("bestEffort"):
+
+        if delivery_failure_count >= self.delivery_failure_threshold and not job.get("delivery", {}).get("bestEffort"):
             health_status = "warning" if health_status == "healthy" else health_status
             issues.append(f"{delivery_failure_count} delivery failure(s) - consider adding --best-effort-deliver")
         
@@ -127,7 +138,7 @@ class CronHealthChecker:
             "recent_error_count": len(recent_errors),
             "timeout_count": timeout_count,
             "delivery_failure_count": delivery_failure_count,
-            "recent_errors": recent_errors[-5:] if recent_errors else []  # Last 5 errors
+            "recent_errors": recent_errors[-self.max_recent_errors_displayed:] if recent_errors else []
         }
     
     def check_all_jobs(self, hours_back: int = 24) -> Dict[str, Any]:
@@ -162,13 +173,27 @@ class CronHealthChecker:
         return results
 
 
+def load_config() -> Dict[str, Any]:
+    """Load config.json from the skill directory (next to scripts/)."""
+    config_path = Path(__file__).resolve().parent.parent / "config.json"
+    if config_path.exists():
+        try:
+            with open(config_path, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"Warning: Failed to load config.json: {e}", file=sys.stderr)
+    return {}
+
+
 def main():
     parser = argparse.ArgumentParser(description="Check OpenClaw cron job health.")
-    parser.add_argument("--hours", type=int, default=24, help="Hours of history to analyze (default: 24)")
+    parser.add_argument("--hours", type=int, default=None, help="Hours of history to analyze (default: from config or 24)")
     parser.add_argument("--json", action="store_true", help="Output results in JSON format")
-    parser.add_argument("--openclaw-home", type=str, help="OpenClaw home directory (default: ~/.openclaw)")
+    parser.add_argument("--openclaw-home", type=str, help="OpenClaw home directory (default: $OPENCLAW_HOME or ~/.openclaw)")
     args = parser.parse_args()
-    
+
+    config = load_config()
+
     if args.openclaw_home:
         openclaw_home = Path(args.openclaw_home).resolve()
         if not openclaw_home.exists():
@@ -178,18 +203,20 @@ def main():
             print(f"Error: --openclaw-home path is not a directory: {openclaw_home}", file=sys.stderr)
             sys.exit(1)
     else:
-        openclaw_home = Path.home() / ".openclaw"
+        openclaw_home = Path(os.environ.get("OPENCLAW_HOME", str(Path.home() / ".openclaw")))
 
-    checker = CronHealthChecker(openclaw_home)
-    results = checker.check_all_jobs(hours_back=args.hours)
-    
+    hours = args.hours if args.hours is not None else config.get("check_interval_hours", 24)
+
+    checker = CronHealthChecker(openclaw_home, config=config)
+    results = checker.check_all_jobs(hours_back=hours)
+
     if args.json:
         print(json.dumps(results, indent=2))
     else:
         print("=" * 70)
         print("CRON JOB HEALTH CHECK")
         print("=" * 70)
-        print(f"\nAnalyzed last {args.hours} hours")
+        print(f"\nAnalyzed last {hours} hours")
         print(f"Total jobs: {results['total_jobs']}")
         print(f"  ✓ Healthy: {results['healthy_jobs']}")
         print(f"  ⚠ Warning: {results['warning_jobs']}")
