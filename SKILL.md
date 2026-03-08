@@ -27,13 +27,13 @@ Monitors the health of OpenClaw cron jobs by analyzing run history and identifyi
 
 ```bash
 # Check health of all cron jobs (last 24 hours)
-python3 /Users/ghost/.openclaw/workspace/skills/cron-health-check/scripts/check_cron_health.py
+python3 ~/.openclaw/workspace/skills/cron-health-check/scripts/check_cron_health.py
 
 # Check last 48 hours
-python3 /Users/ghost/.openclaw/workspace/skills/cron-health-check/scripts/check_cron_health.py --hours 48
+python3 ~/.openclaw/workspace/skills/cron-health-check/scripts/check_cron_health.py --hours 48
 
 # Output JSON format
-python3 /Users/ghost/.openclaw/workspace/skills/cron-health-check/scripts/check_cron_health.py --json
+python3 ~/.openclaw/workspace/skills/cron-health-check/scripts/check_cron_health.py --json
 ```
 
 ## Integration as a Cron Job
