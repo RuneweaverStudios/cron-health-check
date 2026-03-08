@@ -1,7 +1,11 @@
 {
-  "name": "Cron Health Check",
-  "author": "OpenClaw",
+  "schema": "openclaw.skill.v1",
+  "name": "cron-health-check",
   "version": "1.0.0",
+  "displayName": "Cron Health Check",
   "description": "Monitors OpenClaw cron job health and identifies failures, timeouts, and delivery issues.",
+  "author": "OpenClaw",
+  "tags": [],
+  "platform": "openclaw",
   "main": "scripts/check_cron_health.py"
 }
